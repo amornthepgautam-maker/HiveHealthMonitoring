@@ -1,68 +1,61 @@
-import React from "react";
-import { View, Text } from "react-native";
-import { LineChart } from "react-native-chart-kit";
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 
-export default function SensorCard({ label, value, history, width }) {
-  const checkAlert = (key, value) => {
-    const limits = {
-      temperature: [30, 37],
-      humidity: [40, 80],
-      weight: [5, 25],
-      sound: [10, 60]
-    };
-    const [min, max] = limits[key] || [0, 999];
-    return value < min || value > max;
-  };
-
+export default function SensorCard({ title, value, unit, icon, color, alert }) {
   return (
-    <View
-      style={{
-        backgroundColor: "white",
-        borderRadius: 16,
-        padding: 16,
-        marginVertical: 8,
-        shadowColor: "#000",
-        shadowOpacity: 0.1,
-        shadowRadius: 4
-      }}
-    >
-      <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 4 }}>
-        {label.charAt(0).toUpperCase() + label.slice(1)}
+    <View style={[styles.card, alert && styles.alertCard]}>
+      <View style={styles.header}>
+        <Text style={styles.icon}>{icon}</Text>
+        <Text style={styles.title}>{title}</Text>
+      </View>
+      <Text style={[styles.value, { color: alert ? '#ef4444' : color }]}>
+        {value} <Text style={styles.unit}>{unit}</Text>
       </Text>
-      <Text
-        style={{
-          fontSize: 22,
-          fontWeight: "bold",
-          color: checkAlert(label, value) ? "red" : "#059669"
-        }}
-      >
-        {value}{" "}
-        {label === "temperature"
-          ? "°C"
-          : label === "humidity"
-          ? "%"
-          : label === "weight"
-          ? "kg"
-          : "dB"}
-      </Text>
-
-      <LineChart
-        data={{
-          labels: Array(history.length).fill(""),
-          datasets: [{ data: history }]
-        }}
-        width={width}
-        height={180}
-        chartConfig={{
-          backgroundColor: "#fff",
-          backgroundGradientFrom: "#fff",
-          backgroundGradientTo: "#fff",
-          color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
-          strokeWidth: 2
-        }}
-        bezier
-        style={{ borderRadius: 16, marginTop: 8 }}
-      />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    padding: 20,
+    marginVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  alertCard: {
+    borderColor: '#ef4444',
+    borderWidth: 2,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  icon: {
+    fontSize: 24,
+    marginRight: 10,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  value: {
+    fontSize: 32,
+    fontWeight: '800',
+  },
+  unit: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#9ca3af',
+  },
+});

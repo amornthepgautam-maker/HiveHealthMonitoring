@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Dimensions } from 'react-native';
+import { View, Text, ScrollView, Dimensions, StyleSheet, StatusBar, TouchableOpacity } from 'react-native';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue } from 'firebase/database';
+import { getDatabase, ref, onValue, set } from 'firebase/database';
 import { LineChart } from 'react-native-chart-kit';
+import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import SensorCard from './components/SensorCard';
+import SettingsModal from './components/SettingsModal';
 
 // 🔧 Firebase config
 const firebaseConfig = {
@@ -22,13 +26,59 @@ const db = getDatabase(app);
 const screenWidth = Dimensions.get("window").width;
 
 export default function HiveDashboard() {
-  const [data, setData] = useState({});
-  const [history, setHistory] = useState({
-    temperature: [],
-    humidity: [],
-    weight: [],
-    sound: []
+  const [data, setData] = useState({
+    temperature: 0,
+    humidity: 0,
+    weight: 0,
+    sound: 0
   });
+  const [history, setHistory] = useState({
+    temperature: [0],
+    humidity: [0],
+    weight: [0],
+    sound: [0]
+  });
+
+  // ⚙️ Settings State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [alertSettings, setAlertSettings] = useState({
+    temperature: { min: 30, max: 37 },
+    humidity: { min: 40, max: 80 },
+    weight: { min: 5, max: 25 },
+    sound: { min: 10, max: 60 }
+  });
+
+  // 📥 Load Settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const saved = await AsyncStorage.getItem('alertSettings');
+        if (saved) {
+          setAlertSettings(JSON.parse(saved));
+        }
+      } catch (e) {
+        console.error("Failed to load settings", e);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  // 💾 Save Settings
+  const saveSettings = async (newSettings) => {
+    try {
+      // Save to Local Storage
+      await AsyncStorage.setItem('alertSettings', JSON.stringify(newSettings));
+      
+      // Save to Firebase
+      const settingsRef = ref(db, 'hive1/settings');
+      set(settingsRef, newSettings);
+
+      setAlertSettings(newSettings);
+      setModalVisible(false);
+    } catch (e) {
+      console.error("Failed to save settings", e);
+    }
+  };
 
   // 📡 อ่านข้อมูลเรียลไทม์จาก Firebase
   useEffect(() => {
@@ -47,71 +97,126 @@ export default function HiveDashboard() {
     });
   }, []);
 
-  // 🚨 เช็กค่าผิดปกติ
+  // 🚨 เช็กค่าผิดปกติ (ใช้ค่าจาก Settings)
   const checkAlert = (key, value) => {
-    const limits = {
-      temperature: [30, 37],
-      humidity: [40, 80],
-      weight: [5, 25],
-      sound: [10, 60]
-    };
-    const [min, max] = limits[key];
-    return value < min || value > max;
+    const setting = alertSettings[key];
+    if (!setting) return false;
+    return value < setting.min || value > setting.max;
+  };
+
+  const getSensorConfig = (key) => {
+    switch (key) {
+      case 'temperature': return { icon: '🌡️', unit: '°C', color: '#f59e0b', title: 'Temperature' };
+      case 'humidity': return { icon: '💧', unit: '%', color: '#3b82f6', title: 'Humidity' };
+      case 'weight': return { icon: '⚖️', unit: 'kg', color: '#10b981', title: 'Weight' };
+      case 'sound': return { icon: '🔊', unit: 'dB', color: '#ef4444', title: 'Sound' };
+      default: return { icon: '❓', unit: '', color: '#6b7280', title: key };
+    }
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: '#f9fafb', padding: 16 }}>
-      <Text style={{ fontSize: 26, fontWeight: 'bold', textAlign: 'center', marginBottom: 10 }}>
-        🐝 Hive Health Dashboard
-      </Text>
-
-      {Object.keys(data).map((key) => (
-        <View
-          key={key}
-          style={{
-            backgroundColor: 'white',
-            borderRadius: 16,
-            padding: 16,
-            marginVertical: 8,
-            shadowColor: '#000',
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-          }}
-        >
-          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 4 }}>
-            {key.charAt(0).toUpperCase() + key.slice(1)}
-          </Text>
-          <Text
-            style={{
-              fontSize: 22,
-              fontWeight: 'bold',
-              color: checkAlert(key, data[key]) ? 'red' : '#059669',
-            }}
-          >
-            {data[key]} {key === 'temperature' ? '°C' :
-              key === 'humidity' ? '%' :
-                key === 'weight' ? 'kg' : 'dB'}
-          </Text>
-
-          <LineChart
-            data={{
-              labels: Array(history[key].length).fill(''),
-              datasets: [{ data: history[key] }],
-            }}
-            width={screenWidth - 40}
-            height={180}
-            chartConfig={{
-              backgroundColor: '#f3f4f6',
-              backgroundGradientFrom: '#fff',
-              backgroundGradientTo: '#fff',
-              color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
-              strokeWidth: 2,
-            }}
-            bezier
-            style={{ borderRadius: 16, marginTop: 8 }}
-          />
+    <LinearGradient
+      colors={['#064e3b', '#047857', '#10b981']}
+      style={styles.container}
+    >
+      <StatusBar barStyle="light-content" />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.headerContainer}>
+          <View>
+            <Text style={styles.headerTitle}>🐝 Hive Monitor</Text>
+            <Text style={styles.headerSubtitle}>Real-time Dashboard</Text>
+          </View>
+          <TouchableOpacity onPress={() => setModalVisible(true)}>
+            <Text style={styles.settingsIcon}>⚙️</Text>
+          </TouchableOpacity>
         </View>
-      ))}
-    </ScrollView>
+
+        {Object.keys(data).map((key) => {
+          const config = getSensorConfig(key);
+          const isAlert = checkAlert(key, data[key]);
+          
+          return (
+            <View key={key} style={styles.sectionContainer}>
+              <SensorCard
+                title={config.title}
+                value={data[key]}
+                unit={config.unit}
+                icon={config.icon}
+                color={config.color}
+                alert={isAlert}
+              />
+              
+              <LineChart
+                data={{
+                  labels: [], 
+                  datasets: [{ data: history[key] || [0] }],
+                }}
+                width={screenWidth - 48}
+                height={140}
+                chartConfig={{
+                  backgroundColor: 'transparent',
+                  backgroundGradientFrom: '#fff',
+                  backgroundGradientFromOpacity: 0.1,
+                  backgroundGradientTo: '#fff',
+                  backgroundGradientToOpacity: 0.1,
+                  decimalPlaces: 1,
+                  color: (opacity = 1) => isAlert ? `rgba(239, 68, 68, ${opacity})` : `rgba(255, 255, 255, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                  style: { borderRadius: 16 },
+                  propsForDots: { r: "4", strokeWidth: "2", stroke: isAlert ? "#ef4444" : "#fff" }
+                }}
+                bezier
+                style={styles.chart}
+              />
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      <SettingsModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSave={saveSettings}
+        currentSettings={alertSettings}
+      />
+    </LinearGradient>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 24,
+    paddingTop: 60,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'start',
+    marginBottom: 30,
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 1,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#a7f3d0',
+    marginTop: 5,
+  },
+  settingsIcon: {
+    fontSize: 30,
+    marginTop: 5,
+  },
+  sectionContainer: {
+    marginBottom: 24,
+  },
+  chart: {
+    marginVertical: 8,
+    borderRadius: 16,
+  }
+});
