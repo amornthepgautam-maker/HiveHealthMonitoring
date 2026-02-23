@@ -1,45 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Dimensions, StyleSheet, StatusBar, TouchableOpacity } from 'react-native';
-import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, set } from 'firebase/database';
+// ปิด Firebase ไปก่อน จะได้ไม่ Error เวลาไม่มีเน็ต
+// import { ref, onValue, set } from 'firebase/database'; 
+// import { db } from './firebaseConfig'; 
 import { LineChart } from 'react-native-chart-kit';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SensorCard from './components/SensorCard';
 import SettingsModal from './components/SettingsModal';
 
-// 🔧 Firebase config
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://hivehealthmonitoring.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "XXXXXXX",
-  appId: "YOUR_APP_ID"
-};
-
-// 🔥 Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
 const screenWidth = Dimensions.get("window").width;
 
 export default function HiveDashboard() {
   const [data, setData] = useState({
-    temperature: 0,
-    humidity: 0,
-    weight: 0,
-    sound: 0
-  });
-  const [history, setHistory] = useState({
-    temperature: [0],
-    humidity: [0],
-    weight: [0],
-    sound: [0]
+    temperature: 30.5,
+    humidity: 65.0,
+    weight: 10.0,
+    sound: 35
   });
 
-  // ⚙️ Settings State
+  const [history, setHistory] = useState({
+    temperature: [30, 30.5, 31, 30.8],
+    humidity: [60, 62, 65, 64],
+    weight: [9.8, 9.9, 10.0, 10.0],
+    sound: [30, 35, 40, 32]
+  });
+
   const [modalVisible, setModalVisible] = useState(false);
   const [alertSettings, setAlertSettings] = useState({
     temperature: { min: 30, max: 37 },
@@ -53,9 +39,7 @@ export default function HiveDashboard() {
     const loadSettings = async () => {
       try {
         const saved = await AsyncStorage.getItem('alertSettings');
-        if (saved) {
-          setAlertSettings(JSON.parse(saved));
-        }
+        if (saved) setAlertSettings(JSON.parse(saved));
       } catch (e) {
         console.error("Failed to load settings", e);
       }
@@ -66,13 +50,7 @@ export default function HiveDashboard() {
   // 💾 Save Settings
   const saveSettings = async (newSettings) => {
     try {
-      // Save to Local Storage
       await AsyncStorage.setItem('alertSettings', JSON.stringify(newSettings));
-      
-      // Save to Firebase
-      const settingsRef = ref(db, 'hive1/settings');
-      set(settingsRef, newSettings);
-
       setAlertSettings(newSettings);
       setModalVisible(false);
     } catch (e) {
@@ -80,24 +58,32 @@ export default function HiveDashboard() {
     }
   };
 
-  // 📡 อ่านข้อมูลเรียลไทม์จาก Firebase
+  // 🧪 DEMO MODE: จำลองข้อมูลขยับเองทุกๆ 3 วินาที (ใช้พรีเซนต์)
   useEffect(() => {
-    const dataRef = ref(db, 'hive1/data');
-    onValue(dataRef, (snapshot) => {
-      const val = snapshot.val();
-      if (val) {
-        setData(val);
-        setHistory(prev => ({
-          temperature: [...prev.temperature.slice(-9), val.temperature || 0],
-          humidity: [...prev.humidity.slice(-9), val.humidity || 0],
-          weight: [...prev.weight.slice(-9), val.weight || 0],
-          sound: [...prev.sound.slice(-9), val.sound || 0]
-        }));
-      }
-    });
+    const interval = setInterval(() => {
+      // สุ่มตัวเลขให้ดูสมจริง
+      const mockVal = {
+        temperature: parseFloat((30 + Math.random() * 3).toFixed(1)), // สุ่ม 30.0 - 33.0
+        humidity: parseFloat((60 + Math.random() * 10).toFixed(1)),   // สุ่ม 60.0 - 70.0
+        weight: parseFloat((10 + Math.random() * 0.5).toFixed(2)),    // สุ่ม 10.00 - 10.50
+        sound: Math.floor(20 + Math.random() * 30)                    // สุ่ม 20 - 50
+      };
+
+      setData(mockVal);
+
+      // อัปเดตกราฟให้เลื่อนไปเรื่อยๆ (เก็บ 15 ค่าล่าสุด)
+      setHistory(prev => ({
+        temperature: [...prev.temperature, mockVal.temperature].slice(-15),
+        humidity: [...prev.humidity, mockVal.humidity].slice(-15),
+        weight: [...prev.weight, mockVal.weight].slice(-15),
+        sound: [...prev.sound, mockVal.sound].slice(-15)
+      }));
+    }, 3000); // เปลี่ยนค่าทุก 3 วินาที
+
+    return () => clearInterval(interval);
   }, []);
 
-  // 🚨 เช็กค่าผิดปกติ (ใช้ค่าจาก Settings)
+  // 🚨 Alert Logic
   const checkAlert = (key, value) => {
     const setting = alertSettings[key];
     if (!setting) return false;
@@ -115,23 +101,25 @@ export default function HiveDashboard() {
   };
 
   return (
-    <LinearGradient
-      colors={['#064e3b', '#047857', '#10b981']}
-      style={styles.container}
-    >
+    <LinearGradient colors={['#064e3b', '#047857', '#10b981']} style={styles.container}>
       <StatusBar barStyle="light-content" />
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        
+        {/* Header */}
         <View style={styles.headerContainer}>
           <View>
             <Text style={styles.headerTitle}>🐝 Hive Monitor</Text>
-            <Text style={styles.headerSubtitle}>Real-time Dashboard</Text>
+            <Text style={styles.headerSubtitle}>Demo Dashboard</Text>
           </View>
           <TouchableOpacity onPress={() => setModalVisible(true)}>
-            <Text style={styles.settingsIcon}>⚙️</Text>
+            <Text style={{ fontSize: 30 }}>⚙️</Text>
           </TouchableOpacity>
         </View>
 
+        {/* Sensor Cards Loop */}
         {Object.keys(data).map((key) => {
+          if (!['temperature', 'humidity', 'weight', 'sound'].includes(key)) return null;
+
           const config = getSensorConfig(key);
           const isAlert = checkAlert(key, data[key]);
           
@@ -149,21 +137,25 @@ export default function HiveDashboard() {
               <LineChart
                 data={{
                   labels: [], 
-                  datasets: [{ data: history[key] || [0] }],
+                  datasets: [{ data: history[key].length > 0 ? history[key] : [0] }]
                 }}
                 width={screenWidth - 48}
-                height={140}
+                height={160}
+                withDots={true} // โชว์จุดบนกราฟให้ดูมี movement
+                withInnerLines={false}
+                withOuterLines={false}
+                withVerticalLabels={false}
                 chartConfig={{
                   backgroundColor: 'transparent',
-                  backgroundGradientFrom: '#fff',
-                  backgroundGradientFromOpacity: 0.1,
-                  backgroundGradientTo: '#fff',
-                  backgroundGradientToOpacity: 0.1,
+                  backgroundGradientFrom: '#ffffff',
+                  backgroundGradientFromOpacity: 0.2,
+                  backgroundGradientTo: '#ffffff',
+                  backgroundGradientToOpacity: 0.05,
                   decimalPlaces: 1,
-                  color: (opacity = 1) => isAlert ? `rgba(239, 68, 68, ${opacity})` : `rgba(255, 255, 255, ${opacity})`,
-                  labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                  color: (opacity = 1) => config.color,
+                  labelColor: (opacity = 1) => `rgba(255, 255, 255, 0.7)`,
                   style: { borderRadius: 16 },
-                  propsForDots: { r: "4", strokeWidth: "2", stroke: isAlert ? "#ef4444" : "#fff" }
+                  propsForDots: { r: "3", strokeWidth: "1", stroke: "#fff" }
                 }}
                 bezier
                 style={styles.chart}
@@ -184,39 +176,11 @@ export default function HiveDashboard() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 24,
-    paddingTop: 60,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'start',
-    marginBottom: 30,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: 1,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#a7f3d0',
-    marginTop: 5,
-  },
-  settingsIcon: {
-    fontSize: 30,
-    marginTop: 5,
-  },
-  sectionContainer: {
-    marginBottom: 24,
-  },
-  chart: {
-    marginVertical: 8,
-    borderRadius: 16,
-  }
+  container: { flex: 1 },
+  scrollContent: { padding: 24, paddingTop: 60, paddingBottom: 40 },
+  headerContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 25 },
+  headerTitle: { fontSize: 32, fontWeight: '800', color: '#fff' },
+  headerSubtitle: { fontSize: 16, color: '#a7f3d0', marginTop: 5 },
+  sectionContainer: { marginBottom: 20 },
+  chart: { marginVertical: 10, borderRadius: 16 }
 });
