@@ -1,0 +1,28 @@
+{
+  "name": "hivehealthmonitoring",
+  "version": "1.0.0",
+  "description": "🐝 Smart Hive Health Monitoring System (Multi-Hive Edition)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amornthepgautam-maker/HiveHealthMonitoring.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/amornthepgautam-maker/HiveHealthMonitoring/issues"
+  },
+  "homepage": "https://github.com/amornthepgautam-maker/HiveHealthMonitoring#readme",
+  "dependencies": {
+    "expo": "^55.0.4",
+    "express": "^5.2.1",
+    "react-dom": "19.2.0",
+    "react-native-web": "^0.21.0"
+  },
+  "devDependencies": {}
+}

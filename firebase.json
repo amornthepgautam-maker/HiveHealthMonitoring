@@ -1,6 +1,10 @@
 {
   "hosting": {
-    "public": "mobile_app/dist",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+    "public": "web_dashboard",  
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
   }
 }
